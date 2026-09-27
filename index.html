@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>彬的空间 · 星空个人主页</title>
+<style>
+:root{
+  --bg-deep:#050816;
+  --card:rgba(13,20,46,.62);
+  --card-border:rgba(120,160,255,.22);
+  --accent:#7ea6ff;
+  --accent2:#9d7eff;
+  --text:#e8edff;
+  --text-dim:#9aa7d0;
+  --danger:#ff7e8a;
+  --radius:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  min-height:100vh;
+  background:radial-gradient(ellipse at top,#0b1236 0%,var(--bg-deep) 55%,#02030d 100%);
+  color:var(--text);
+  font-family:"PingFang SC","Microsoft YaHei","Helvetica Neue",Arial,sans-serif;
+  overflow-x:hidden;
+}
+#sky{position:fixed;inset:0;z-index:0;pointer-events:none}
+.wrap{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:48px 20px 80px}
+
+/* ===== 头部 ===== */
+header{ text-align:center;margin-bottom:44px;animation:fadeDown 1.2s ease both}
+header .avatar{
+  width:88px;height:88px;margin:0 auto 18px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;
+  font-size:40px;font-weight:700;color:#fff;
+  box-shadow:0 0 40px rgba(126,166,255,.45),inset 0 0 18px rgba(255,255,255,.25);
+}
+header h1{
+  font-size:40px;letter-spacing:8px;font-weight:600;
+  background:linear-gradient(90deg,#cfe0ff,#8fb0ff,#c4a6ff);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 30px rgba(143,176,255,.35);
+}
+header .slogan{margin-top:10px;color:var(--text-dim);letter-spacing:3px;font-size:14px}
+header .skyline{margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+header .skyline span{
+  font-size:12px;color:var(--accent);border:1px solid var(--card-border);
+  padding:3px 12px;border-radius:99px;background:rgba(126,166,255,.08)
+}
+
+/* ===== 折叠区块 ===== */
+details.panel{
+  background:var(--card);
+  border:1px solid var(--card-border);
+  border-radius:var(--radius);
+  margin-bottom:22px;
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  box-shadow:0 8px 32px rgba(0,0,20,.45);
+  overflow:hidden;
+  transition:box-shadow .3s;
+}
+details.panel[open]{box-shadow:0 10px 40px rgba(30,60,160,.35)}
+details.panel summary{
+  list-style:none;cursor:pointer;user-select:none;
+  padding:20px 24px;display:flex;align-items:center;gap:14px;
+  font-size:19px;font-weight:600;letter-spacing:2px;
+  transition:background .25s;
+}
+details.panel summary::-webkit-details-marker{display:none}
+details.panel summary:hover{background:rgba(126,166,255,.07)}
+details.panel summary .ico{
+  width:38px;height:38px;border-radius:11px;flex:none;
+  display:flex;align-items:center;justify-content:center;font-size:20px;
+  background:linear-gradient(135deg,rgba(126,166,255,.25),rgba(157,126,255,.25));
+  border:1px solid var(--card-border);
+}
+details.panel summary .arrow{
+  margin-left:auto;color:var(--accent);transition:transform .3s;font-size:14px;
+}
+details.panel[open] summary .arrow{transform:rotate(180deg)}
+.panel-body{padding:6px 24px 26px;animation:fadeUp .45s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes fadeDown{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:none}}
+
+/* ===== 通用控件 ===== */
+input,textarea,select,button{font-family:inherit;font-size:14px;color:var(--text)}
+input[type=text],input[type=url],input[type=date],textarea,select{
+  background:rgba(8,12,32,.75);border:1px solid var(--card-border);
+  border-radius:10px;padding:10px 13px;outline:none;width:100%;
+  transition:border .25s,box-shadow .25s;
+}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(126,166,255,.18)}
+textarea{resize:vertical;min-height:88px;line-height:1.7}
+.btn{
+  border:none;border-radius:10px;padding:10px 20px;cursor:pointer;
+  background:linear-gradient(135deg,#5d8bff,#8f6dff);color:#fff;font-weight:600;letter-spacing:1px;
+  transition:transform .2s,box-shadow .2s,opacity .2s;
+}
+.btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(93,139,255,.4)}
+.btn:active{transform:none}
+.btn.ghost{background:transparent;border:1px solid var(--card-border);color:var(--text-dim)}
+.btn.ghost:hover{color:var(--text);box-shadow:none;border-color:var(--accent)}
+.btn.small{padding:5px 12px;font-size:12px;border-radius:8px}
+.btn.danger{background:transparent;border:1px solid rgba(255,126,138,.4);color:var(--danger)}
+.empty-tip{color:var(--text-dim);font-size:13px;text-align:center;padding:22px 0;letter-spacing:1px}
+.form-row{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.form-row > *{flex:1;min-width:140px}
+.hint{font-size:12px;color:var(--text-dim);line-height:1.8}
+.divider{height:1px;background:linear-gradient(90deg,transparent,var(--card-border),transparent);margin:18px 0}
+
+/* ===== 网址导航 ===== */
+#linkGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+.link-card{
+  display:flex;align-items:center;gap:12px;padding:14px;
+  background:rgba(8,12,32,.55);border:1px solid var(--card-border);border-radius:13px;
+  text-decoration:none;color:var(--text);transition:transform .22s,border .22s,box-shadow .22s;
+  position:relative;
+}
+.link-card:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 8px 24px rgba(93,139,255,.28)}
+.link-card .favicon{
+  width:36px;height:36px;border-radius:9px;flex:none;font-size:17px;
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,rgba(126,166,255,.22),rgba(157,126,255,.22));
+  border:1px solid var(--card-border);overflow:hidden;
+}
+.link-card .favicon img{width:20px;height:20px}
+.link-card .meta{min-width:0;flex:1}
+.link-card .name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.link-card .url{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
+.link-card .del{
+  position:absolute;top:6px;right:8px;opacity:0;color:var(--danger);cursor:pointer;
+  font-size:13px;transition:opacity .2s;background:none;border:none;
+}
+.link-card:hover .del{opacity:1}
+
+/* ===== 打卡空间 ===== */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:18px}
+.stat-box{
+  text-align:center;padding:16px 8px;border-radius:13px;
+  background:rgba(8,12,32,.55);border:1px solid var(--card-border);
+}
+.stat-box .num{font-size:30px;font-weight:700;color:var(--accent);text-shadow:0 0 18px rgba(126,166,255,.5)}
+.stat-box .lbl{font-size:12px;color:var(--text-dim);margin-top:5px;letter-spacing:2px}
+#checkinBtn{width:100%;padding:14px;font-size:16px;letter-spacing:4px;border-radius:13px}
+#checkinBtn:disabled{opacity:.55;cursor:default;transform:none;box-shadow:none}
+.checkin-list{margin-top:16px;max-height:250px;overflow-y:auto}
+.checkin-list::-webkit-scrollbar{width:5px}
+.checkin-list::-webkit-scrollbar-thumb{background:var(--card-border);border-radius:3px}
+.ci-row{
+  display:flex;align-items:center;gap:10px;padding:9px 13px;margin-bottom:8px;
+  background:rgba(8,12,32,.5);border:1px solid rgba(120,160,255,.12);border-radius:10px;font-size:13px;
+}
+.ci-row .dot{width:8px;height:8px;border-radius:50%;background:#6dffb8;box-shadow:0 0 8px #6dffb8;flex:none}
+.ci-row.auto .dot{background:#ffd86d;box-shadow:0 0 8px #ffd86d}
+.ci-row .t{margin-left:auto;color:var(--text-dim);font-size:12px}
+.badge{font-size:11px;padding:1px 9px;border-radius:99px;border:1px solid var(--card-border);color:var(--text-dim)}
+
+/* ===== 心情日记 ===== */
+.mood-picker{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.mood-picker .mood{
+  width:42px;height:42px;font-size:21px;cursor:pointer;border-radius:11px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(8,12,32,.55);border:1px solid var(--card-border);transition:all .2s;
+}
+.mood-picker .mood:hover{transform:translateY(-2px)}
+.mood-picker .mood.on{border-color:var(--accent);background:rgba(126,166,255,.18);box-shadow:0 0 14px rgba(126,166,255,.35)}
+.diary-item{
+  background:rgba(8,12,32,.5);border:1px solid rgba(120,160,255,.12);
+  border-radius:13px;padding:16px;margin-bottom:14px;
+}
+.diary-item .head{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.diary-item .emoji{font-size:22px}
+.diary-item .date{color:var(--text-dim);font-size:12px}
+.diary-item .ops{margin-left:auto;display:flex;gap:8px}
+.diary-item .content{font-size:14px;line-height:1.9;white-space:pre-wrap;word-break:break-word;color:#d5ddf7}
+
+footer{
+  text-align:center;margin-top:50px;color:var(--text-dim);font-size:12px;letter-spacing:2px;line-height:2;
+}
+footer a{color:var(--accent);text-decoration:none}
+.toast{
+  position:fixed;left:50%;bottom:36px;transform:translateX(-50%) translateY(80px);
+  background:rgba(13,20,46,.92);border:1px solid var(--accent);color:var(--text);
+  padding:11px 26px;border-radius:99px;font-size:14px;z-index:99;letter-spacing:1px;
+  transition:transform .35s cubic-bezier(.2,.9,.3,1.3);box-shadow:0 8px 30px rgba(0,0,30,.6);
+}
+.toast.show{transform:translateX(-50%) translateY(0)}
+@media(max-width:600px){
+  header h1{font-size:30px;letter-spacing:5px}
+  .panel-body{padding:4px 16px 20px}
+  details.panel summary{padding:16px 16px}
+}
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+<div class="wrap">
+
+  <header>
+    <div class="avatar">彬</div>
+    <h1>彬的空间</h1>
+    <p class="slogan">—— 仰望星空，脚踏实地 ——</p>
+    <div class="skyline">
+      <span id="nowDate"></span>
+      <span id="streakBadge">🔥 连续打卡 0 天</span>
+      <span>✨ 星空主题 · GitHub Pages</span>
+    </div>
+  </header>
+
+  <!-- 副标题1：网址导航 -->
+  <details class="panel" open id="panelNav">
+    <summary><span class="ico">🧭</span>网址导航<span class="arrow">▼</span></summary>
+    <div class="panel-body">
+      <div class="form-row">
+        <input type="text" id="linkName" placeholder="网站名称（如：GitHub）" maxlength="30">
+        <input type="url" id="linkUrl" placeholder="网址（https://...）">
+        <button class="btn" style="flex:0 0 auto" id="addLinkBtn">＋ 添加</button>
+      </div>
+      <div id="linkGrid"></div>
+      <div class="empty-tip" id="linkEmpty">还没有收藏网址，添加第一个吧 ✨</div>
+    </div>
+  </details>
+
+  <!-- 副标题2：打卡空间 -->
+  <details class="panel" id="panelCheckin">
+    <summary><span class="ico">📍</span>打卡空间<span class="arrow">▼</span></summary>
+    <div class="panel-body">
+      <div class="stats">
+        <div class="stat-box"><div class="num" id="statTotal">0</div><div class="lbl">累计打卡</div></div>
+        <div class="stat-box"><div class="num" id="statStreak">0</div><div class="lbl">连续天数</div></div>
+        <div class="stat-box"><div class="num" id="statAuto">0</div><div class="lbl">云端自动打卡</div></div>
+      </div>
+      <button class="btn" id="checkinBtn">今 日 打 卡</button>
+      <p class="hint" style="margin-top:10px">
+        ⏰ 仓库内置 GitHub Actions 定时打卡脚本（每天北京时间 08:30 自动运行并提交记录），下方黄点为云端自动打卡、绿点为手动打卡。
+      </p>
+      <div class="divider"></div>
+      <div class="checkin-list" id="checkinList"></div>
+    </div>
+  </details>
+
+  <!-- 副标题3：心情日记 -->
+  <details class="panel" id="panelDiary">
+    <summary><span class="ico">📖</span>心情日记<span class="arrow">▼</span></summary>
+    <div class="panel-body">
+      <div class="mood-picker" id="moodPicker">
+        <div class="mood on" data-mood="😊">😊</div>
+        <div class="mood" data-mood="😐">😐</div>
+        <div class="mood" data-mood="😢">😢</div>
+        <div class="mood" data-mood="😡">😡</div>
+        <div class="mood" data-mood="🥰">🥰</div>
+        <div class="mood" data-mood="😴">😴</div>
+        <div class="mood" data-mood="🤩">🤩</div>
+        <div class="mood" data-mood="😢">🌧️</div>
+      </div>
+      <textarea id="diaryText" placeholder="今天的心情、见闻、想法……随手记下来（自动保存在本地）"></textarea>
+      <div class="form-row" style="margin-top:12px">
+        <button class="btn" id="saveDiaryBtn">✍️ 保存日记</button>
+        <button class="btn ghost" id="exportDiaryBtn">⬇️ 导出备份</button>
+        <button class="btn ghost" id="importDiaryBtn">⬆️ 导入上期保存</button>
+        <input type="file" id="importFile" accept=".json" style="display:none">
+      </div>
+      <div class="divider"></div>
+      <div id="diaryList"></div>
+      <div class="empty-tip" id="diaryEmpty">日记本还是空的，写下第一页吧 📖</div>
+    </div>
+  </details>
+
+  <footer>
+    © 2026 彬的空间 · 星空之下 皆是无垠<br>
+    <a href="https://github.com/Q4250203q/ding2026001" target="_blank" rel="noopener">GitHub 仓库</a>
+  </footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ 工具 ============ */
+const $=s=>document.querySelector(s);
+const store={
+  get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
+  set(k,v){localStorage.setItem(k,JSON.stringify(v))}
+};
+let toastTimer;
+function toast(msg){
+  const t=$('#toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2400);
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+/* ============ 星空背景 ============ */
+(function(){
+  const cv=$('#sky'),ctx=cv.getContext('2d');
+  let W,H,stars=[],meteors=[];
+  function resize(){
+    W=cv.width=innerWidth;H=cv.height=innerHeight;
+    const n=Math.min(240,Math.floor(W*H/6000));
+    stars=[];
+    for(let i=0;i<n;i++)stars.push({
+      x:Math.random()*W,y:Math.random()*H,
+      r:Math.random()*1.5+.3,
+      a:Math.random(),                 // 当前亮度
+      da:(Math.random()*.04+.006)*(Math.random()>.5?1:-1), // 闪烁速度
+      vy:Math.random()*.05+.01,        // 缓慢漂移
+      hue:Math.random()<.15?'180,200,255':'255,255,255'
+    });
+  }
+  function spawnMeteor(){
+    if(meteors.length>2)return;
+    const ang=Math.PI/4+Math.random()*.3;
+    meteors.push({
+      x:Math.random()*W*.8+W*.1,y:-20,
+      vx:Math.cos(ang)*(6+Math.random()*4),vy:Math.sin(ang)*(6+Math.random()*4),
+      life:1
+    });
+  }
+  let meteorTimer=0;
+  function frame(){
+    ctx.clearRect(0,0,W,H);
+    // 星星
+    for(const s of stars){
+      s.a+=s.da;
+      if(s.a<=.05||s.a>=1)s.da*=-1;
+      s.y+=s.vy;if(s.y>H+2){s.y=-2;s.x=Math.random()*W}
+      ctx.beginPath();
+      ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${s.hue},${Math.max(s.a,.08)})`;
+      ctx.fill();
+      if(s.r>1.3){ // 大星星光晕
+        ctx.beginPath();ctx.arc(s.x,s.y,s.r*3,0,Math.PI*2);
+        ctx.fillStyle=`rgba(${s.hue},${s.a*.08})`;ctx.fill();
+      }
+    }
+    // 流星
+    meteorTimer-=1;
+    if(meteorTimer<=0){spawnMeteor();meteorTimer=200+Math.random()*400;}
+    for(let i=meteors.length-1;i>=0;i--){
+      const m=meteors[i];
+      m.x+=m.vx;m.y+=m.vy;m.life-=.008;
+      if(m.life<=0||m.y>H+60){meteors.splice(i,1);continue}
+      const grad=ctx.createLinearGradient(m.x,m.y,m.x-m.vx*14,m.y-m.vy*14);
+      grad.addColorStop(0,`rgba(255,255,255,${m.life*.95})`);
+      grad.addColorStop(1,'rgba(255,255,255,0)');
+      ctx.strokeStyle=grad;ctx.lineWidth=1.6;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(m.x,m.y);ctx.lineTo(m.x-m.vx*14,m.y-m.vy*14);ctx.stroke();
+      ctx.beginPath();ctx.arc(m.x,m.y,1.8,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,255,255,${m.life})`;ctx.fill();
+    }
+    requestAnimationFrame(frame);
+  }
+  resize();frame();
+  addEventListener('resize',resize);
+})();
+/* ============ 网址导航 ============ */
+const NAV_KEY='bin_links';
+function getLinks(){return store.get(NAV_KEY,[
+  {name:'GitHub',url:'https://github.com'},
+  {name:'彬的空间 · 本站仓库',url:'https://github.com/Q4250203q/ding2026001'}
+])}
+function renderLinks(){
+  const links=getLinks(),grid=$('#linkGrid');
+  grid.innerHTML='';
+  $('#linkEmpty').style.display=links.length?'none':'block';
+  links.forEach((l,i)=>{
+    const a=document.createElement('a');
+    a.className='link-card';a.href=l.url;a.target='_blank';a.rel='noopener';
+    let host='';try{host=new URL(l.url).hostname}catch(e){}
+    a.innerHTML=`
+      <div class="favicon">${host?`<img src="https://icons.duckduckgo.com/ip3/${esc(host)}.ico" onerror="this.parentNode.textContent='🔗'">`:'🔗'}</div>
+      <div class="meta"><div class="name">${esc(l.name)}</div><div class="url">${esc(host||l.url)}</div></div>
+      <button class="del" title="删除">✕</button>`;
+    a.querySelector('.del').onclick=e=>{
+      e.preventDefault();e.stopPropagation();
+      const arr=getLinks();arr.splice(i,1);store.set(NAV_KEY,arr);renderLinks();toast('已删除「'+l.name+'」');
+    };
+    grid.appendChild(a);
+  });
+}
+function addLink(){
+  const name=$('#linkName').value.trim(),url=$('#linkUrl').value.trim();
+  if(!name)return toast('请填写网站名称');
+  if(!url)return toast('请填写网址');
+  const full=/^https?:\/\//i.test(url)?url:'https://'+url;
+  try{new URL(full)}catch(e){return toast('网址格式不正确')}
+  const arr=getLinks();arr.unshift({name,url:full});store.set(NAV_KEY,arr);
+  $('#linkName').value='';$('#linkUrl').value='';
+  renderLinks();toast('已添加「'+name+'」🚀');
+}
+$('#addLinkBtn').onclick=addLink;
+$('#linkUrl').addEventListener('keydown',e=>{if(e.key==='Enter')addLink()});
+renderLinks();
+
+/* ============ 打卡空间 ============ */
+const CI_KEY='bin_checkins';
+let autoRecords=[];
+const todayStr=(d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+function getLocal(){return store.get(CI_KEY,[])}
+function calcStreak(list){
+  // list: 'YYYY-MM-DD' 字符串数组
+  const set=new Set(list);let n=0;const d=new Date();
+  // 今天没打则从昨天起算连续（展示口径）
+  if(!set.has(todayStr(d)))d.setDate(d.getDate()-1);
+  while(set.has(todayStr(d))){n++;d.setDate(d.getDate()-1)}
+  return n;
+}
+function renderCheckin(){
+  const local=getLocal().map(x=>({...x,type:'local'}));
+  const all=[...local,...autoRecords.map(x=>({...x,type:'auto'}))]
+    .sort((a,b)=>b.date.localeCompare(a.date)||String(b.time||'').localeCompare(String(a.time||'')));
+  $('#statTotal').textContent=new Set(all.map(x=>x.date)).size;
+  const streak=calcStreak(all.map(x=>x.date));
+  $('#statStreak').textContent=streak;
+  $('#streakBadge').textContent='🔥 连续打卡 '+streak+' 天';
+  $('#statAuto').textContent=new Set(autoRecords.map(x=>x.date)).size;
+  const list=$('#checkinList');list.innerHTML=all.length?'':'<div class="empty-tip">还没有打卡记录</div>';
+  all.slice(0,60).forEach(r=>{
+    const row=document.createElement('div');
+    row.className='ci-row'+(r.type==='auto'?' auto':'');
+    row.innerHTML=`<span class="dot"></span><b>${r.date}</b>
+      <span class="badge">${r.type==='auto'?'☁️ 云端自动':'✋ 手动'}</span>
+      <span class="t">${esc(r.time||'')}</span>`;
+    list.appendChild(row);
+  });
+  const done=local.some(x=>x.date===todayStr());
+  const btn=$('#checkinBtn');
+  btn.disabled=done;btn.textContent=done?'✅ 今日已打卡':'今 日 打 卡';
+}
+function doCheckin(){
+  const local=getLocal();
+  if(local.some(x=>x.date===todayStr()))return toast('今天已经打过卡啦');
+  const d=new Date();
+  local.push({date:todayStr(),time:`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`});
+  store.set(CI_KEY,local);renderCheckin();toast('打卡成功，又是元气满满的一天 ✨');
+}
+$('#checkinBtn').onclick=doCheckin;
+// 拉取云端（GitHub Actions）自动打卡记录
+(async function(){
+  try{
+    const r=await fetch('checkins.json?t='+Date.now(),{cache:'no-store'});
+    if(r.ok){
+      const data=await r.json();
+      autoRecords=Array.isArray(data.records)?data.records:[];
+      renderCheckin();
+    }
+  }catch(e){/* 本地打开或未部署时忽略 */}
+})();
+renderCheckin();
+/* ============ 心情日记 ============ */
+const DIARY_KEY='bin_diary';
+let curMood='😊';
+function getDiary(){return store.get(DIARY_KEY,[])}
+$('#moodPicker').addEventListener('click',e=>{
+  const m=e.target.closest('.mood');if(!m)return;
+  document.querySelectorAll('.mood').forEach(x=>x.classList.remove('on'));
+  m.classList.add('on');curMood=m.dataset.mood;
+});
+function renderDiary(){
+  const list=getDiary(),box=$('#diaryList');
+  box.innerHTML='';
+  $('#diaryEmpty').style.display=list.length?'none':'block';
+  list.forEach((d,i)=>{
+    const item=document.createElement('div');item.className='diary-item';
+    item.innerHTML=`
+      <div class="head">
+        <span class="emoji">${d.mood}</span>
+        <span class="date">${esc(d.date)} ${esc(d.time||'')}</span>
+        <span class="ops">
+          <button class="btn small ghost" data-act="copy">复制</button>
+          <button class="btn small danger" data-act="del">删除</button>
+        </span>
+      </div>
+      <div class="content">${esc(d.text)}</div>`;
+    item.querySelector('[data-act=del]').onclick=()=>{
+      const arr=getDiary();arr.splice(i,1);store.set(DIARY_KEY,arr);renderDiary();toast('日记已删除');
+    };
+    item.querySelector('[data-act=copy]').onclick=()=>{
+      navigator.clipboard.writeText(d.text).then(()=>toast('已复制到剪贴板'),()=>toast('复制失败'));
+    };
+    box.appendChild(item);
+  });
+}
+function saveDiary(){
+  const text=$('#diaryText').value.trim();
+  if(!text)return toast('先写点什么吧 ✍️');
+  const d=new Date();
+  const arr=getDiary();
+  arr.unshift({
+    mood:curMood,text,
+    date:todayStr(),
+    time:`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+  });
+  store.set(DIARY_KEY,arr);
+  $('#diaryText').value='';
+  renderDiary();toast('日记已保存到本地 📖');
+}
+$('#saveDiaryBtn').onclick=saveDiary;
+// 导出备份
+$('#exportDiaryBtn').onclick=()=>{
+  const data={type:'bin-diary-backup',exportedAt:new Date().toISOString(),entries:getDiary()};
+  if(!data.entries.length)return toast('还没有日记可导出');
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='彬的心情日记备份-'+todayStr()+'.json';
+  a.click();URL.revokeObjectURL(a.href);
+  toast('备份已导出 💾');
+};
+// 导入上期保存
+$('#importDiaryBtn').onclick=()=>$('#importFile').click();
+$('#importFile').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const data=JSON.parse(rd.result);
+      const entries=Array.isArray(data)?data:(Array.isArray(data.entries)?data.entries:null);
+      if(!entries)throw 0;
+      const cur=getDiary();
+      const seen=new Set(cur.map(x=>x.date+'|'+x.time+'|'+x.text));
+      let added=0;
+      entries.forEach(x=>{
+        if(x&&x.text&&!seen.has(x.date+'|'+x.time+'|'+x.text)){cur.push(x);added++}
+      });
+      cur.sort((a,b)=>(b.date+(b.time||'')).localeCompare(a.date+(a.time||'')));
+      store.set(DIARY_KEY,cur);renderDiary();
+      toast(`成功导入上期保存 ${added} 篇日记 📚`);
+    }catch(err){toast('文件格式不正确，导入失败')}
+    e.target.value='';
+  };
+  rd.readAsText(f,'utf-8');
+};
+renderDiary();
+
+/* 顶部日期 */
+(function(){
+  const d=new Date(),wk='日一二三四五六';
+  $('#nowDate').textContent=`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 · 星期${wk[d.getDay()]}`;
+})();
+</script>
+</body>
+</html>
