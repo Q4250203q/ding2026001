@@ -1,0 +1,32 @@
+name: 每日自动打卡
+
+on:
+  schedule:
+    - cron: '30 0 * * *'   # UTC 00:30 = 北京时间 08:30
+  workflow_dispatch:        # 支持手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  checkin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 运行打卡签到脚本
+        run: node checkin.js
+
+      - name: 提交打卡记录
+        run: |
+          if [ -f .checkin_changed ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add checkins.json
+            git commit -m "chore: ⏰ 自动打卡 $(date -u -d '+8 hours' '+%Y-%m-%d')"
+            git push
+            echo "打卡记录已推送"
+          else
+            echo "今日已打卡，无需提交"
+          fi
