@@ -188,6 +188,60 @@ footer a{color:var(--accent);text-decoration:none}
   transition:transform .35s cubic-bezier(.2,.9,.3,1.3);box-shadow:0 8px 30px rgba(0,0,30,.6);
 }
 .toast.show{transform:translateX(-50%) translateY(0)}
+/* ===== 访问密码 ===== */
+#gate{
+  position:fixed;inset:0;z-index:100;
+  background:radial-gradient(ellipse at top,#0b1236 0%,#050816 55%,#02030d 100%);
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity .6s;
+}
+#gate.hide{opacity:0;pointer-events:none}
+#gate .gate-box{
+  text-align:center;padding:44px 46px;width:min(360px,90vw);
+  background:rgba(13,20,46,.62);border:1px solid rgba(120,160,255,.22);
+  border-radius:20px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  box-shadow:0 8px 32px rgba(0,0,20,.45);animation:fadeUp .8s ease both;
+}
+#gate .gate-ico{font-size:42px;margin-bottom:12px;filter:drop-shadow(0 0 14px rgba(126,166,255,.6))}
+#gate h2{
+  font-size:22px;letter-spacing:5px;margin-bottom:6px;font-weight:600;
+  background:linear-gradient(90deg,#cfe0ff,#8fb0ff,#c4a6ff);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+#gate p{font-size:12px;color:var(--text-dim);letter-spacing:2px;margin-bottom:22px}
+#gate input{
+  text-align:center;font-size:22px;letter-spacing:12px;font-weight:700;
+  margin-bottom:14px;height:52px;
+}
+#gate.shake .gate-box{animation:shake .45s}
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  20%,60%{transform:translateX(-9px)}
+  40%,80%{transform:translateX(9px)}
+}
+
+/* ===== 脚本库 ===== */
+.script-row{
+  display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:9px;
+  background:rgba(8,12,32,.5);border:1px solid rgba(120,160,255,.12);border-radius:11px;font-size:13px;
+}
+.script-row .s-ico{
+  width:34px;height:34px;border-radius:9px;flex:none;font-size:12px;font-weight:700;color:var(--accent);
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,rgba(126,166,255,.18),rgba(157,126,255,.18));
+  border:1px solid var(--card-border);text-transform:uppercase;
+}
+.script-row .s-meta{min-width:0;flex:1}
+.script-row .s-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.script-row .s-sub{font-size:11px;color:var(--text-dim);margin-top:2px}
+.script-row .s-ops{display:flex;gap:6px;flex:none}
+.drop-zone{
+  border:1.5px dashed rgba(120,160,255,.35);border-radius:13px;padding:22px 12px;
+  text-align:center;color:var(--text-dim);font-size:13px;cursor:pointer;letter-spacing:1px;
+  transition:all .25s;margin-bottom:12px;line-height:2;
+}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--accent);background:rgba(126,166,255,.08);color:var(--text)}
+
 @media(max-width:600px){
   header h1{font-size:30px;letter-spacing:5px}
   .panel-body{padding:4px 16px 20px}
@@ -197,7 +251,19 @@ footer a{color:var(--accent);text-decoration:none}
 </head>
 <body>
 <canvas id="sky"></canvas>
-<div class="wrap">
+
+<!-- 访问密码验证层 -->
+<div id="gate">
+  <div class="gate-box">
+    <div class="gate-ico">🌌</div>
+    <h2>彬的空间</h2>
+    <p>PRIVATE · 请输入访问密码</p>
+    <input type="password" id="gatePwd" placeholder="••••" maxlength="20" autocomplete="off">
+    <button class="btn" id="gateBtn" style="width:100%;padding:12px;letter-spacing:6px">进 入</button>
+  </div>
+</div>
+
+<div class="wrap" id="appWrap" style="visibility:hidden">
 
   <header>
     <div class="avatar">彬</div>
@@ -239,6 +305,19 @@ footer a{color:var(--accent);text-decoration:none}
       </p>
       <div class="divider"></div>
       <div class="checkin-list" id="checkinList"></div>
+
+      <div class="divider"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;letter-spacing:2px;font-size:15px;font-weight:600">⚡ 脚本仓库</div>
+      <div class="drop-zone" id="dropZone">
+        📤 点击选择 或 拖拽脚本文件到此处上传<br>
+        <span style="font-size:11px;color:var(--text-dim)">
+          支持：.js .py .sh .bat .ps1 .ts .php .rb .go .pl .lua .r .sql .html .css .json .yaml .yml .toml .ini .conf .txt / md / 每个最大 2MB
+        </span>
+      </div>
+      <input type="file" id="scriptFile" multiple style="display:none"
+        accept=".js,.py,.sh,.bat,.cmd,.ps1,.ts,.tsx,.php,.rb,.go,.pl,.lua,.r,.sql,.html,.htm,.css,.scss,.json,.yaml,.yml,.toml,.ini,.conf,.cfg,.env,.txt,.md,.vue,.jsx,.java,.c,.cpp,.h,.cs,.swift,.kt,.m,.scala,.dart,.groovy,.fish,.zsh,.awk,.sed,.vbs,.ahk,.psm1">
+      <div id="scriptList"></div>
+      <div class="empty-tip" id="scriptEmpty">还没有上传脚本，拖一个上来试试 ⚡</div>
     </div>
   </details>
 
@@ -289,6 +368,35 @@ function toast(msg){
   clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2400);
 }
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+/* ============ 访问密码 ============ */
+const SITE_PWD='1234';
+(function(){
+  const gate=$('#gate'),input=$('#gatePwd');
+  const SESSION_KEY='bin_auth_ok', TTL=12*3600*1000; // 12小时免重复输入
+  function unlock(){
+    gate.classList.add('hide');
+    $('#appWrap').style.visibility='visible';
+    store.set(SESSION_KEY,{t:Date.now()});
+    toast('欢迎来到彬的空间 ✨');
+  }
+  function tryUnlock(){
+    if(input.value===SITE_PWD){unlock()}
+    else{
+      gate.classList.remove('shake');void gate.offsetWidth;gate.classList.add('shake');
+      input.value='';input.focus();
+      toast('密码不正确，请重试');
+    }
+  }
+  // 会话缓存：12小时内免输
+  const saved=store.get(SESSION_KEY,null);
+  if(saved&&Date.now()-saved.t<TTL){unlock()}
+  else{
+    setTimeout(()=>input.focus(),300);
+    $('#gateBtn').onclick=tryUnlock;
+    input.addEventListener('keydown',e=>{if(e.key==='Enter')tryUnlock()});
+  }
+})();
 
 /* ============ 星空背景 ============ */
 (function(){
@@ -442,7 +550,91 @@ $('#checkinBtn').onclick=doCheckin;
     if(r.ok){
       const data=await r.json();
       autoRecords=Array.isArray(data.records)?data.records:[];
-      renderCheckin();
+renderCheckin();
+
+/* ============ 脚本仓库（上传/管理） ============ */
+const SCRIPT_KEY='bin_scripts', SCRIPT_MAX=2*1024*1024; // 2MB
+const SCRIPT_TYPES={
+  js:'JS',mjs:'JS',cjs:'JS',ts:'TS',tsx:'TS',jsx:'JSX',vue:'VUE',
+  py:'PY',sh:'SH',bash:'SH',zsh:'SH',fish:'SH',bat:'BAT',cmd:'BAT',
+  ps1:'PS1',psm1:'PS1',php:'PHP',rb:'RB',go:'GO',pl:'PL',lua:'LUA',
+  r:'R',sql:'SQL',html:'HTML',htm:'HTML',css:'CSS',scss:'CSS',json:'JSON',
+  yaml:'YML',yml:'YML',toml:'TOML',ini:'INI',conf:'CFG',cfg:'CFG',
+  txt:'TXT',md:'MD',java:'JAVA',c:'C',cpp:'C++',h:'H',cs:'C#',
+  swift:'SWIFT',kt:'KT',m:'OBJC',scala:'SCALA',dart:'DART',
+  groovy:'GRV',awk:'AWK',sed:'SED',vbs:'VBS',ahk:'AHK',env:'ENV'
+};
+function getScripts(){return store.get(SCRIPT_KEY,[])}
+function fmtSize(b){return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(2)+' MB'}
+function extOf(name){const m=name.match(/\.([a-z0-9]+)$/i);return m?m[1].toLowerCase():''}
+function renderScripts(){
+  const list=getScripts(),box=$('#scriptList');
+  box.innerHTML='';
+  $('#scriptEmpty').style.display=list.length?'none':'block';
+  list.forEach((s,i)=>{
+    const row=document.createElement('div');row.className='script-row';
+    const tag=SCRIPT_TYPES[extOf(s.name)]||'FILE';
+    row.innerHTML=`
+      <div class="s-ico">${esc(tag)}</div>
+      <div class="s-meta">
+        <div class="s-name">${esc(s.name)}</div>
+        <div class="s-sub">${fmtSize(s.size)} · ${esc(s.date)} 上传</div>
+      </div>
+      <div class="s-ops">
+        <button class="btn small ghost" data-act="dl">下载</button>
+        <button class="btn small ghost" data-act="view">查看</button>
+        <button class="btn small danger" data-act="del">删除</button>
+      </div>`;
+    row.querySelector('[data-act=del]').onclick=()=>{
+      const arr=getScripts();arr.splice(i,1);store.set(SCRIPT_KEY,arr);renderScripts();toast('脚本已删除');
+    };
+    row.querySelector('[data-act=dl]').onclick=()=>{
+      const blob=new Blob([s.content],{type:'application/octet-stream'});
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=s.name;
+      a.click();URL.revokeObjectURL(a.href);
+    };
+    row.querySelector('[data-act=view]').onclick=()=>{
+      const w=window.open('','_blank');
+      if(!w)return toast('浏览器拦截了新窗口');
+      w.document.write('<pre style="background:#0d122e;color:#d5ddf7;padding:20px;font-size:13px;line-height:1.8;overflow:auto;white-space:pre-wrap;word-break:break-all;min-height:100vh;margin:0">'+s.content.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</pre>');
+      w.document.title=s.name;
+    };
+    box.appendChild(row);
+  });
+}
+function addScriptFiles(files){
+  const arr=getScripts();
+  let ok=0,skip=0;
+  const tasks=[...files].map(f=>new Promise(res=>{
+    const ext=extOf(f.name);
+    if(!SCRIPT_TYPES[ext]){skip++;toast(`跳过「${f.name}」：不支持的格式 .${ext||'未知'}`);return res()}
+    if(f.size>SCRIPT_MAX){skip++;toast(`跳过「${f.name}」：超过 2MB 限制`);return res()}
+    const rd=new FileReader();
+    rd.onload=()=>{
+      const idx=arr.findIndex(x=>x.name===f.name);
+      const item={name:f.name,size:f.size,date:todayStr(),content:rd.result};
+      if(idx>-1){arr[idx]=item;ok++}
+      else{arr.unshift(item);ok++}
+      res();
+    };
+    rd.onerror=()=>{skip++;res()};
+    rd.readAsText(f,'utf-8');
+  }));
+  Promise.all(tasks).then(()=>{
+    if(ok){
+      store.set(SCRIPT_KEY,arr);renderScripts();
+      toast(`成功上传 ${ok} 个脚本 ⚡${skip?'，跳过 '+skip+' 个':''}`);
+    }
+  });
+}
+$('#dropZone').onclick=()=>$('#scriptFile').click();
+$('#scriptFile').onchange=e=>{addScriptFiles(e.target.files);e.target.value=''};
+const dz=$('#dropZone');
+['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag')}));
+['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag')}));
+dz.addEventListener('drop',e=>{if(e.dataTransfer?.files?.length)addScriptFiles(e.dataTransfer.files)});
+renderScripts();
+
     }
   }catch(e){/* 本地打开或未部署时忽略 */}
 })();
