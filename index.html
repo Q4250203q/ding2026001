@@ -235,6 +235,28 @@ footer a{color:var(--accent);text-decoration:none}
 .script-row .s-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .script-row .s-sub{font-size:11px;color:var(--text-dim);margin-top:2px}
 .script-row .s-ops{display:flex;gap:6px;flex:none}
+.run-lib-row{
+  background:rgba(8,12,32,.5);border:1px solid rgba(120,160,255,.12);
+  border-radius:13px;padding:14px;margin-bottom:12px;
+}
+.run-lib-row .head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.run-lib-row .s-ico{
+  width:34px;height:34px;border-radius:9px;flex:none;font-size:12px;font-weight:700;color:var(--accent);
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,rgba(126,166,255,.18),rgba(157,126,255,.18));
+  border:1px solid var(--card-border);text-transform:uppercase;
+}
+.run-lib-row .s-name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.run-lib-row .s-sub{font-size:11px;color:var(--text-dim);margin-top:2px}
+.run-lib-row .ops{display:flex;gap:6px;flex:none}
+.run-log{
+  background:rgba(0,0,15,.65);border:1px solid rgba(120,160,255,.15);border-radius:10px;
+  padding:10px 13px;font-family:Consolas,monospace;font-size:12px;line-height:1.8;color:#a9c4ff;
+  white-space:pre-wrap;word-break:break-all;max-height:220px;overflow-y:auto;
+}
+.run-log .ok{color:#6dffb8}
+.run-log .err{color:var(--danger)}
+
 .drop-zone{
   border:1.5px dashed rgba(120,160,255,.35);border-radius:13px;padding:22px 12px;
   text-align:center;color:var(--text-dim);font-size:13px;cursor:pointer;letter-spacing:1px;
@@ -317,6 +339,12 @@ footer a{color:var(--accent);text-decoration:none}
       <input type="file" id="scriptFile" multiple style="position:absolute;width:1px;height:1px;opacity:0;left:-9999px">
       <div id="scriptList"></div>
       <div class="empty-tip" id="scriptEmpty">还没有上传脚本，拖一个上来试试 ⚡</div>
+
+      <div class="divider"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;letter-spacing:2px;font-size:15px;font-weight:600">🚀 运行库</div>
+      <p class="hint" style="margin-bottom:12px">在上方脚本列表点击「加入运行库」，.js 脚本可在此直接运行（浏览器内执行，自动捕获输出并记录每次运行状态）。</p>
+      <div id="runLibList"></div>
+      <div class="empty-tip" id="runLibEmpty">运行库为空，去上方脚本列表添加吧 🚀</div>
     </div>
   </details>
 
@@ -633,6 +661,7 @@ function renderScripts(){
         <div class="s-sub">${fmtSize(s.size)} · ${esc(s.date)} 上传</div>
       </div>
       <div class="s-ops">
+        <button class="btn small ${s.inLib?'':'ghost'}" data-act="lib">${s.inLib?'★ 已在运行库':'☆ 加入运行库'}</button>
         <button class="btn small ghost" data-act="dl">下载</button>
         <button class="btn small ghost" data-act="view">查看</button>
         <button class="btn small danger" data-act="del">删除</button>
@@ -651,8 +680,86 @@ function renderScripts(){
       w.document.write('<pre style="background:#0d122e;color:#d5ddf7;padding:20px;font-size:13px;line-height:1.8;overflow:auto;white-space:pre-wrap;word-break:break-all;min-height:100vh;margin:0">'+s.content.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))+'</pre>');
       w.document.title=s.name;
     };
+    row.querySelector('[data-act=lib]').onclick=()=>{
+      const arr=getScripts();
+      arr[i].inLib=!arr[i].inLib;
+      if(!arr[i].inLib){delete arr[i].lastRun;delete arr[i].lastResult;delete arr[i].lastOutput}
+      store.set(SCRIPT_KEY,arr);renderScripts();
+      toast(arr[i].inLib?'已加入运行库 🚀':'已移出运行库');
+    };
     box.appendChild(row);
   });
+  renderRunLib();
+}
+
+/* ============ 运行库 ============ */
+function renderRunLib(){
+  const list=getScripts().filter(s=>s.inLib),box=$('#runLibList');
+  box.innerHTML='';
+  $('#runLibEmpty').style.display=list.length?'none':'block';
+  list.forEach(s=>{
+    const jsRun=extOf(s.name)==='js'||extOf(s.name)==='mjs';
+    const row=document.createElement('div');row.className='run-lib-row';
+    const statusHtml=s.lastResult
+      ?`<span class="badge" style="color:${s.lastResult==='ok'?'#6dffb8':'var(--danger)'}">${s.lastResult==='ok'?'✔ 运行成功':'✘ 运行出错'} · ${esc(s.lastRun||'')}</span>`
+      :'<span class="badge">未运行过</span>';
+    row.innerHTML=`
+      <div class="head">
+        <div class="s-ico">${esc(SCRIPT_TYPES[extOf(s.name)]||'FILE')}</div>
+        <div class="s-meta" style="flex:1;min-width:0">
+          <div class="s-name">${esc(s.name)}</div>
+          <div class="s-sub" style="display:flex;gap:8px;align-items:center;margin-top:3px">${statusHtml}</div>
+        </div>
+        <div class="ops">
+          ${jsRun?'<button class="btn small" data-act="run">▶ 运行</button>':'<span class="badge" style="align-self:center">浏览器仅支持 .js 执行</span>'}
+          <button class="btn small danger" data-act="out">移出</button>
+        </div>
+      </div>
+      ${s.lastOutput?`<div class="run-log">${esc(s.lastOutput)}</div>`:''}`;
+    row.querySelector('[data-act=out]').onclick=()=>{
+      const arr=getScripts();
+      const t=arr.find(x=>x.name===s.name);
+      if(t){t.inLib=false;delete t.lastRun;delete t.lastResult;delete t.lastOutput}
+      store.set(SCRIPT_KEY,arr);renderScripts();toast('已移出运行库');
+    };
+    const runBtn=row.querySelector('[data-act=run]');
+    if(runBtn)runBtn.onclick=()=>runJsScript(s.name);
+    box.appendChild(row);
+  });
+}
+function runJsScript(name){
+  const arr=getScripts(),s=arr.find(x=>x.name===name);
+  if(!s)return toast('脚本不存在');
+  // 捕获 console 输出
+  const logs=[];
+  const wrap=(orig,level)=>(...a)=>{
+    logs.push((level==='error'?'[错误] ':level==='warn'?'[警告] ':'')+a.map(x=>{try{return typeof x==='object'?JSON.stringify(x):String(x)}catch(e){return String(x)}}).join(' '));
+    orig(...a);
+  };
+  const oLog=console.log,oWarn=console.warn,oErr=console.error;
+  console.log=wrap(oLog,'log');console.warn=wrap(oWarn,'warn');console.error=wrap(oErr,'error');
+  const t0=performance.now();
+  const done=(ok,extra)=>{
+    console.log=oLog;console.warn=oWarn;console.error=oErr;
+    const ms=Math.round(performance.now()-t0);
+    if(extra)logs.push(extra);
+    logs.push(`—— 运行${ok?'完成':'出错'} · 耗时 ${ms}ms · ${new Date().toLocaleString('zh-CN')} ——`);
+    s.lastResult=ok?'ok':'err';
+    s.lastRun=new Date().toLocaleString('zh-CN');
+    s.lastOutput=logs.join('\n').slice(0,1500);
+    store.set(SCRIPT_KEY,arr);renderScripts();
+    toast(ok?'脚本运行成功 ✅':'脚本运行出错 ✘');
+  };
+  try{
+    const fn=new Function('"use strict";return (async()=>{\n'+s.content+'\n})()');
+    const r=fn();
+    Promise.resolve(r).then(v=>{
+      if(v!==undefined)logs.push('返回值: '+(typeof v==='object'?JSON.stringify(v):String(v)));
+      done(true);
+    }).catch(e=>done(false,'[未捕获异常] '+e.message));
+  }catch(e){
+    done(false,'[语法/加载错误] '+e.message);
+  }
 }
 function addScriptFiles(files){
   const arr=getScripts();
