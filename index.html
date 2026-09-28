@@ -347,6 +347,59 @@ footer a{color:var(--accent);text-decoration:none}
     </div>
   </details>
 
+  <!-- 副标题4：面板专区 -->
+  <details class="panel" id="panelPanelZone">
+    <summary><span class="ico">🖥️</span>面板专区<span class="arrow">▼</span></summary>
+    <div class="panel-body">
+
+      <!-- 呆呆面板卡片 -->
+      <div style="background:linear-gradient(135deg,rgba(126,166,255,.12),rgba(157,126,255,.12));border:1px solid var(--card-border);border-radius:13px;padding:18px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+          <span style="font-size:26px">🐼</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:16px;font-weight:700;letter-spacing:1px">呆呆面板 · Daidai Panel</div>
+            <div style="font-size:11px;color:var(--text-dim);margin-top:2px">轻量级定时任务管理面板 · 青龙面板平替 · Go + Vue3 + SQLite</div>
+          </div>
+          <span class="badge">v3.3.3</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <a class="btn small" style="text-decoration:none;display:inline-block" href="https://linzixuanzz.github.io/daidai-panel/" target="_blank" rel="noopener">▶️ 在线演示</a>
+          <a class="btn small ghost" style="text-decoration:none;display:inline-block" href="https://github.com/linzixuanzz/daidai-panel" target="_blank" rel="noopener">📦 官方仓库</a>
+          <a class="btn small ghost" style="text-decoration:none;display:inline-block" href="https://dumb-panel.apifox.cn/" target="_blank" rel="noopener">📖 API 文档</a>
+        </div>
+        <div class="hint" style="margin:0">
+          支持多语言脚本定时执行 · 22 种消息推送 · 订阅管理 · 依赖管理 · 2FA · 一键备份
+        </div>
+      </div>
+
+      <!-- 我的面板地址 -->
+      <div style="background:rgba(8,12,32,.5);border:1px solid rgba(120,160,255,.12);border-radius:13px;padding:16px;margin-bottom:14px">
+        <div style="font-size:14px;font-weight:600;letter-spacing:1px;margin-bottom:8px">🔗 我的面板地址</div>
+        <div class="form-row" style="margin-bottom:0">
+          <input type="url" id="panelUrl" placeholder="部署后填入你的面板地址（http://服务器IP:5700）">
+          <button class="btn" style="flex:0 0 auto" id="savePanelUrlBtn">保存</button>
+          <a class="btn ghost" style="flex:0 0 auto;text-decoration:none;display:none" id="openPanelBtn" target="_blank" rel="noopener">🚀 打开面板</a>
+          <button class="btn danger" style="flex:0 0 auto;display:none" id="clearPanelUrlBtn">清除</button>
+        </div>
+        <p class="hint" style="margin-top:8px">呆呆面板为服务端应用，无法直接运行在本静态站点上；仓库 <b>daidai-panel/</b> 目录已备好一键部署文件，部署完成后将地址填到这里即可直达。</p>
+      </div>
+
+      <!-- 部署指引 -->
+      <div style="background:rgba(8,12,32,.5);border:1px solid rgba(120,160,255,.12);border-radius:13px;padding:16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-size:14px;font-weight:600;letter-spacing:1px">🛠️ Docker 一键部署（服务器 / NAS）</span>
+        </div>
+        <div style="background:rgba(0,0,15,.6);border:1px solid rgba(120,160,255,.15);border-radius:10px;padding:12px 14px;font-family:Consolas,monospace;font-size:12px;line-height:1.9;color:#a9c4ff;overflow-x:auto;white-space:nowrap;margin-bottom:10px" id="deployCmd">git clone https://github.com/Q4250203q/ding2026001.git && cd ding2026001/daidai-panel && docker compose up -d</div>
+        <div class="form-row" style="margin-bottom:0">
+          <button class="btn small" id="copyDeployBtn">📋 复制部署命令</button>
+          <a class="btn small ghost" style="text-decoration:none;display:inline-block" href="https://github.com/Q4250203q/ding2026001/tree/main/daidai-panel" target="_blank" rel="noopener">📂 查看部署文件</a>
+        </div>
+        <p class="hint" style="margin-top:10px">部署后访问 http://服务器IP:5700 初始化管理员账号；配置文件见仓库 daidai-panel/ 目录说明。</p>
+      </div>
+
+    </div>
+  </details>
+
   <footer>
     © 2026 彬的空间 · 星空之下 皆是无垠<br>
     <a href="https://github.com/Q4250203q/ding2026001" target="_blank" rel="noopener">GitHub 仓库</a>
@@ -633,6 +686,36 @@ const dz=$('#dropZone');
 ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag')}));
 dz.addEventListener('drop',e=>{if(e.dataTransfer?.files?.length)addScriptFiles(e.dataTransfer.files)});
 renderScripts();
+
+/* ============ 面板专区 ============ */
+const PANEL_URL_KEY='bin_panel_url';
+function renderPanelUrl(){
+  const url=store.get(PANEL_URL_KEY,'');
+  const open=$('#openPanelBtn'),clear=$('#clearPanelUrlBtn');
+  if(url){
+    open.style.display='inline-block';open.href=url;
+    clear.style.display='inline-block';
+    $('#panelUrl').value=url;
+  }else{
+    open.style.display='none';clear.style.display='none';
+  }
+}
+$('#savePanelUrlBtn').onclick=()=>{
+  let v=$('#panelUrl').value.trim();
+  if(!v)return toast('请先填入面板地址');
+  if(!/^https?:\/\//i.test(v))v='http://'+v;
+  try{new URL(v)}catch(e){return toast('地址格式不正确')}
+  store.set(PANEL_URL_KEY,v);renderPanelUrl();toast('面板地址已保存 🚀');
+};
+$('#panelUrl').addEventListener('keydown',e=>{if(e.key==='Enter')$('#savePanelUrlBtn').click()});
+$('#clearPanelUrlBtn').onclick=()=>{
+  store.set(PANEL_URL_KEY,'');$('#panelUrl').value='';renderPanelUrl();toast('已清除面板地址');
+};
+$('#copyDeployBtn').onclick=()=>{
+  const cmd=$('#deployCmd').textContent.trim();
+  navigator.clipboard.writeText(cmd).then(()=>toast('部署命令已复制 📋'),()=>toast('复制失败，请手动复制'));
+};
+renderPanelUrl();
 
     }
   }catch(e){/* 本地打开或未部署时忽略 */}
