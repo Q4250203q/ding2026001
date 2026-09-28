@@ -314,8 +314,7 @@ footer a{color:var(--accent);text-decoration:none}
           支持：.js .py .sh .bat .ps1 .ts .php .rb .go .pl .lua .r .sql .html .css .json .yaml .yml .toml .ini .conf .txt / md / 每个最大 2MB
         </span>
       </div>
-      <input type="file" id="scriptFile" multiple style="display:none"
-        accept=".js,.py,.sh,.bat,.cmd,.ps1,.ts,.tsx,.php,.rb,.go,.pl,.lua,.r,.sql,.html,.htm,.css,.scss,.json,.yaml,.yml,.toml,.ini,.conf,.cfg,.env,.txt,.md,.vue,.jsx,.java,.c,.cpp,.h,.cs,.swift,.kt,.m,.scala,.dart,.groovy,.fish,.zsh,.awk,.sed,.vbs,.ahk,.psm1">
+      <input type="file" id="scriptFile" multiple style="position:absolute;width:1px;height:1px;opacity:0;left:-9999px">
       <div id="scriptList"></div>
       <div class="empty-tip" id="scriptEmpty">还没有上传脚本，拖一个上来试试 ⚡</div>
     </div>
