@@ -730,17 +730,62 @@ function renderRunLib(){
 function runJsScript(name){
   const arr=getScripts(),s=arr.find(x=>x.name===name);
   if(!s)return toast('脚本不存在');
-  // 捕获 console 输出
-  const logs=[];
-  const wrap=(orig,level)=>(...a)=>{
-    logs.push((level==='error'?'[错误] ':level==='warn'?'[警告] ':'')+a.map(x=>{try{return typeof x==='object'?JSON.stringify(x):String(x)}catch(e){return String(x)}}).join(' '));
-    orig(...a);
+  // ===== 预处理：兼容常见脚本写法 =====
+  let code=(s.content||'').replace(/^\uFEFF/,'').replace(/^#![^\n]*\n?/,''); // 去BOM/shebang
+  code=code.replace(/^[ \t]*export[ \t]+default[ \t]+/m,'');   // 网上脚本常见模块导出
+  code=code.replace(/^[ \t]*export[ \t]+/gm,'');
+  // import 语句转换（仅支持 http(s) 远程模块）
+  const importRe=/^[ \t]*import[ \t]+(?:(\*[ \t]+as[ \t]+[\w$]+)|([\w$]+)|(\{[^}]*\}))[ \t]+from[ \t]+['"]([^'"]+)['"];?[ \t]*$/gm;
+  let nodeImport=null;
+  code=code.replace(importRe,(m,ns,def,named,src)=>{
+    if(!/^https?:\/\//i.test(src)){nodeImport=src;return ''}
+    if(ns)return 'const '+ns.replace(/[ \t]+/g,' ')+' = await import("'+src+'");';
+    if(def)return 'const '+def+' = (await import("'+src+'")).default;';
+    return 'const '+named.replace(/([\w$]+)[ \t]+as[ \t]+([\w$]+)/g,'$1: $2')+' = await import("'+src+'");';
+  });
+  let logs=[];
+  if(nodeImport)logs.push('[提示] 已忽略 Node.js 模块导入 "'+nodeImport+'"：浏览器无法加载本地/包模块，请改用 https 远程地址或在呆呆面板运行');
+  // ===== Web Worker 沙箱：独立线程执行，死循环不卡页面、超时可强杀 =====
+  const workerSrc=`
+self.onmessage=async function(e){
+  var code=e.data;
+  var logs=[];
+  var send=function(t,d){self.postMessage(Object.assign({type:t},d||{}))};
+  var wrap=function(l){
+    return function(){
+      var a=Array.prototype.slice.call(arguments);
+      var line=(l==='error'?'[错误] ':l==='warn'?'[警告] ':'')+a.map(function(x){
+        try{return typeof x==='object'?JSON.stringify(x):String(x)}catch(e){return String(x)}
+      }).join(' ');
+      logs.push(line);
+      if(logs.length<=300)send('log',{line:line});
+    };
   };
-  const oLog=console.log,oWarn=console.warn,oErr=console.error;
-  console.log=wrap(oLog,'log');console.warn=wrap(oWarn,'warn');console.error=wrap(oErr,'error');
+  console.log=wrap('log');console.warn=wrap('warn');console.error=wrap('error');
+  var require=function(m){throw new Error('require("'+m+'") 是 Node.js 专属能力，浏览器无法执行。请把此脚本放到服务器或呆呆面板运行。')};
+  var process={env:{},argv:[],platform:'browser',exit:function(){}};
+  var module={exports:{}},exports={},Buffer={from:function(x){return x}};
+  var v;
+  var finish=function(ok,err){
+    if(ok&&v!==undefined)logs.push('返回值: '+(typeof v==='object'?JSON.stringify(v):String(v)));
+    if(err)logs.push(err);
+    send('done',{ok:ok,logs:logs});
+  };
+  try{
+    var fn=new Function('require','process','module','exports','Buffer','__filename','__dirname','"use strict";return (async()=>{\\n'+code+'\\n})()');
+    var r=fn(require,process,module,exports,Buffer,'worker','worker');
+    Promise.resolve(r).then(function(res){v=res;finish(true,null)})
+      .catch(function(err){finish(false,'[未捕获异常] '+err.message)});
+  }catch(e){
+    finish(false,'[语法/加载错误] '+e.message);
+  }
+};`;
   const t0=performance.now();
-  const done=(ok,extra)=>{
-    console.log=oLog;console.warn=oWarn;console.error=oErr;
+  let finished=false,timer,w;
+  const finish=(ok,extra)=>{
+    if(finished)return;finished=true;
+    clearTimeout(timer);
+    try{w.terminate()}catch(e){}
     const ms=Math.round(performance.now()-t0);
     if(extra)logs.push(extra);
     logs.push(`—— 运行${ok?'完成':'出错'} · 耗时 ${ms}ms · ${new Date().toLocaleString('zh-CN')} ——`);
@@ -751,14 +796,22 @@ function runJsScript(name){
     toast(ok?'脚本运行成功 ✅':'脚本运行出错 ✘');
   };
   try{
-    const fn=new Function('"use strict";return (async()=>{\n'+s.content+'\n})()');
-    const r=fn();
-    Promise.resolve(r).then(v=>{
-      if(v!==undefined)logs.push('返回值: '+(typeof v==='object'?JSON.stringify(v):String(v)));
-      done(true);
-    }).catch(e=>done(false,'[未捕获异常] '+e.message));
+    const url=URL.createObjectURL(new Blob([workerSrc],{type:'text/javascript'}));
+    w=new Worker(url);
+    timer=setTimeout(()=>finish(false,'[超时] 运行超过 20 秒已强制终止（可能有死循环或长时间等待）'),20000);
+    w.onmessage=e=>{
+      const d=e.data;
+      if(d.type==='log')logs.push(d.line);
+      else if(d.type==='done'){
+        // 以 worker 汇总的日志为准（含返回值行），保留主线程的预处理提示
+        logs=logs.filter(x=>x.startsWith('[提示]')).concat(d.logs||[]);
+        finish(d.ok,null);
+      }
+    };
+    w.onerror=e=>finish(false,'[脚本错误] '+(e.message||'未知错误'));
+    w.postMessage(code);
   }catch(e){
-    done(false,'[语法/加载错误] '+e.message);
+    finish(false,'[环境错误] 无法启动运行沙箱：'+e.message);
   }
 }
 function addScriptFiles(files){
