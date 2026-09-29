@@ -832,9 +832,80 @@ function runJsScript(name){
         createHash:a=>{throw new Error('crypto.createHash("'+a+'") 暂不支持，浏览器可用 crypto.subtle 的 async API')},
         timingSafeEqual:(a,b)=>String(a)===String(b)
       };
+      // ===== dns（DNS-over-HTTPS 实现，多提供方自动切换） =====
+      var DOH_PROVIDERS=['https://dns.alidns.com/resolve','https://dns.google/resolve'];
+      var dohProvider=0;
+      async function dohQuery(name,type){
+        var lastErr=null;
+        for(var t=0;t<DOH_PROVIDERS.length;t++){
+          var idx=(dohProvider+t)%DOH_PROVIDERS.length;
+          try{
+            const r=await fetch(DOH_PROVIDERS[idx]+'?name='+encodeURIComponent(name)+'&type='+type,{signal:AbortSignal.timeout(6000)});
+            if(!r.ok)throw new Error('HTTP '+r.status);
+            const j=await r.json();
+            dohProvider=idx; // 记住可用的提供方
+            return j;
+          }catch(e){lastErr=e}
+        }
+        throw new Error('DNS 查询失败（所有 DoH 服务不可达）: '+(lastErr&&lastErr.message||lastErr));
+      }
+      async function dnsResolve(name,type,fld){
+        if(!/^[a-z0-9.-]+$/i.test(name))throw new Error('无效域名: '+name);
+        const j=await dohQuery(name,type);
+        if(j.Status!==0)throw new Error('DNS 查询失败: '+({1:'格式错误',2:'服务器失败',3:'域名不存在'}[j.Status]||'状态码 '+j.Status));
+        const ans=(j.Answer||[]).filter(a=>a.type===(type==='A'?1:type==='AAAA'?28:type==='MX'?15:type==='TXT'?16:type==='CNAME'?5:1));
+        if(!ans.length)throw new Error('未找到 '+type+' 记录: '+name);
+        return ans.map(a=>{
+          if(fld==='exchange')return a.data.split(' ').pop();
+          return a.data.replace(/^"|"$/g,'');
+        });
+      }
+      const dns={
+        lookup:(name,cb)=>{
+          const p=(async()=>{
+            const j=await dohQuery(name,'A');
+            const ans=(j.Answer||[]).find(a=>a.type===1);
+            if(!ans)throw new Error('未找到域名地址: '+name);
+            return{address:ans.data,family:4};
+          })();
+          if(!cb)return p;
+          p.then(r=>cb(null,r.address,r)).catch(e=>cb(e));
+        },
+        resolve:(name,cb)=>dns.promises.resolve4(name).then(r=>cb(null,r)).catch(e=>cb(e)),
+        resolve4:(name,cb)=>dns.promises.resolve4(name).then(r=>cb(null,r)).catch(e=>cb(e)),
+        resolve6:(name,cb)=>dns.promises.resolve6(name).then(r=>cb(null,r)).catch(e=>cb(e)),
+        resolveMx:(name,cb)=>dns.promises.resolveMx(name).then(r=>cb(null,r)).catch(e=>cb(e)),
+        resolveTxt:(name,cb)=>dns.promises.resolveTxt(name).then(r=>cb(null,r)).catch(e=>cb(e)),
+        resolveCname:(name,cb)=>dns.promises.resolveCname(name).then(r=>cb(null,r)).catch(e=>cb(e)),
+        reverse:(ip,cb)=>dns.promises.reverse(ip).then(r=>cb(null,r)).catch(e=>cb(e)),
+        promises:{
+          lookup:async name=>{const j=await dohQuery(name,'A');const ans=(j.Answer||[]).find(a=>a.type===1);
+            if(!ans)throw new Error('未找到域名地址: '+name);return{address:ans.data,family:4}},
+          resolve4:async name=>dnsResolve(name,'A'),
+          resolve6:async name=>dnsResolve(name,'AAAA'),
+          resolveMx:async name=>(await dnsResolve(name,'MX','exchange')).map(x=>({exchange:x,priority:10})),
+          resolveTxt:async name=>[await dnsResolve(name,'TXT')],
+          resolveCname:async name=>dnsResolve(name,'CNAME'),
+          reverse:async ip=>{const j=await dohQuery(ip.split('.').reverse().join('.')+'.in-addr.arpa','PTR');
+            return (j.Answer||[]).map(a=>a.data)}
+        },
+        Resolver:class{resolve4(n,c){dns.resolve4(n,c)}resolve6(n,c){dns.resolve6(n,c)}resolveMx(n,c){dns.resolveMx(n,c)}resolveTxt(n,c){dns.resolveTxt(n,c)}}
+      };
+      // ===== net / tls / dgram（明确不支持，给出友好提示） =====
+      const netShim={
+        connect:()=>{throw new Error('net.connect 原始 TCP 连接浏览器不支持，HTTP(S) 请求请用 fetch/axios/http.get')},
+        createConnection:()=>{throw new Error('net.createConnection 原始 TCP 连接浏览器不支持，HTTP(S) 请求请用 fetch/axios')},
+        Socket:class{},isIP:()=>0
+      };
+      const tlsShim={connect:()=>{throw new Error('tls.connect 浏览器不支持，HTTPS 请求请用 fetch/axios')},
+        createServer:()=>{throw new Error('tls.createServer 浏览器不支持')},TLSSocket:class{}};
+      const dgramShim={createSocket:()=>{throw new Error('dgram UDP 套接字浏览器不支持')}};
       const unsupported=m=>{throw new Error('模块 "'+m+'" 在浏览器沙箱暂不支持，请在呆呆面板运行')}
       const MODULES={fs,path,os,axios,'node-fetch':fetch,'cross-fetch':fetch,
-        http:httpShim,https:httpShim,crypto,
+        http:httpShim,https:httpShim,crypto,dns,net:netShim,tls:tlsShim,dgram:dgramShim,
+        'node:dns':dns,'node:fs':fs,'node:path':path,'node:os':os,'node:crypto':crypto,
+        'node:http':httpShim,'node:https':httpShim,
+        'dns/promises':dns.promises,'node:dns/promises':dns.promises,
         url:{parse:u=>new URL(u),URL},
         querystring:{parse:q=>Object.fromEntries(new URLSearchParams(q)),stringify:o=>new URLSearchParams(o).toString()},
         events:class{constructor(){this._h={}}on(k,f){(this._h[k]=this._h[k]||[]).push(f);return this}emit(k,...a){(this._h[k]||[]).forEach(f=>f(...a))}},
