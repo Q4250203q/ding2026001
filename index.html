@@ -744,42 +744,149 @@ function runJsScript(name){
     return 'const '+named.replace(/([\w$]+)[ \t]+as[ \t]+([\w$]+)/g,'$1: $2')+' = await import("'+src+'");';
   });
   let logs=[];
-  if(nodeImport)logs.push('[提示] 已忽略 Node.js 模块导入 "'+nodeImport+'"：浏览器无法加载本地/包模块，请改用 https 远程地址或在呆呆面板运行');
-  // ===== Web Worker 沙箱：独立线程执行，死循环不卡页面、超时可强杀 =====
-  const workerSrc=`
-self.onmessage=async function(e){
-  var code=e.data;
-  var logs=[];
-  var send=function(t,d){self.postMessage(Object.assign({type:t},d||{}))};
-  var wrap=function(l){
-    return function(){
-      var a=Array.prototype.slice.call(arguments);
-      var line=(l==='error'?'[错误] ':l==='warn'?'[警告] ':'')+a.map(function(x){
-        try{return typeof x==='object'?JSON.stringify(x):String(x)}catch(e){return String(x)}
-      }).join(' ');
-      logs.push(line);
-      if(logs.length<=300)send('log',{line:line});
+  if(nodeImport)logs.push('[提示] import "'+nodeImport+'" 已交给 require 兼容层处理（若为内置模块将自动模拟）');
+  // ===== Worker 沙箱 + Node 兼容层 =====
+  // 真实函数序列化为 Worker 源码（内部可正常使用模板字符串）
+  function workerMain(){
+    self.onmessage=async function(e){
+      const msg=e.data, code=msg.code, VFS=msg.vfs||{}, ENV=msg.env||{};
+      let dirty=false, logs=[];
+      const send=(t,d)=>self.postMessage(Object.assign({type:t},d||{}));
+      const wrap=l=>(...a)=>{
+        const line=(l==='error'?'[错误] ':l==='warn'?'[警告] ':'')+a.map(x=>{try{return typeof x==='object'?JSON.stringify(x):String(x)}catch(e){return String(x)}}).join(' ');
+        logs.push(line);
+        if(logs.length<=300)send('log',{line});
+      };
+      console.log=wrap('log');console.warn=wrap('warn');console.error=wrap('error');
+      // ===== 虚拟文件系统 =====
+      const norm=p=>String(p).replace(/\\/g,'/').replace(/^\.\//,'').replace(/^\/+/,'').replace(/^(\.\.\/)+/,'');
+      const enoent=p=>{const err=new Error("ENOENT: no such file or directory, open '"+p+"'");err.code='ENOENT';return err};
+      const fs={
+        readFileSync:(p)=>{const k=norm(p);if(!(k in VFS))throw enoent(p);return VFS[k]},
+        writeFileSync:(p,d)=>{VFS[norm(p)]=String(d);dirty=true},
+        appendFileSync:(p,d)=>{const k=norm(p);VFS[k]=(k in VFS?VFS[k]:'')+String(d);dirty=true},
+        existsSync:(p)=>norm(p) in VFS,
+        unlinkSync:(p)=>{const k=norm(p);if(!(k in VFS))throw enoent(p);delete VFS[k];dirty=true},
+        mkdirSync:()=>{},rmdirSync:()=>{},
+        readdirSync:(p)=>{const pre=norm(p);const set=new Set();
+          for(const k in VFS){if(k===pre||k.startsWith(pre+'/')){const rest=k===pre?'':k.slice(pre.length+1);
+            if(rest&&!rest.includes('/'))set.add(rest);else if(rest)set.add(rest.split('/')[0]);}}
+          return [...set]},
+        statSync:(p)=>{const k=norm(p);if(!(k in VFS))throw enoent(p);
+          return{size:VFS[k].length,isFile:()=>true,isDirectory:()=>false,mtime:new Date()}},
+        promises:{
+          readFile:async p=>fs.readFileSync(p),
+          writeFile:async(p,d)=>fs.writeFileSync(p,d),
+          appendFile:async(p,d)=>fs.appendFileSync(p,d),
+          unlink:async p=>fs.unlinkSync(p)
+        },
+        createReadStream:()=>{throw new Error('fs.createReadStream 浏览器暂不支持')},
+        WatchStream:null,constants:{}
+      };
+      // ===== path / os =====
+      const path={
+        join:(...p)=>p.filter(x=>x).join('/').replace(/\/{2,}/g,'/').replace(/\/$/,'')||'/',
+        resolve:(...p)=>path.join(...p),normalize:p=>norm(p),
+        basename:(p,s)=>{const b=norm(p).split('/').pop();return s&&b.endsWith(s)?b.slice(0,-s.length):b},
+        dirname:p=>{const a=norm(p).split('/');a.pop();return a.join('/')||'.'},
+        extname:p=>{const m=norm(p).match(/\.[^.\/]+$/);return m?m[0]:''},
+        sep:'/',delimiter:':',isAbsolute:p=>String(p).startsWith('/')
+      };
+      const os={platform:()=>'linux',homedir:()=>'/home/bin',hostname:()=>'bin-space',
+        tmpdir:()=>'/tmp',EOL:'\n',type:()=>'Linux',arch:()=>'x64',
+        totalmem:()=>8*1024*1024*1024,freemem:()=>4*1024*1024*1024,cpus:()=>[{model:'sandbox'}]};
+      // ===== 网络垫片（基于 fetch） =====
+      async function fetchWrap(url,cfg){
+        cfg=cfg||{};
+        const opt={method:(cfg.method||'GET').toUpperCase(),headers:cfg.headers||{}};
+        if(cfg.data!==undefined){
+          opt.body=typeof cfg.data==='object'?JSON.stringify(cfg.data):String(cfg.data);
+          if(!opt.headers['Content-Type']&&!opt.headers['content-type'])opt.headers['Content-Type']='application/json';
+        }
+        const r=await fetch(url,opt);
+        const text=await r.text();
+        let data=text;
+        try{const ct=(r.headers.get('content-type')||'');if(ct.includes('json'))data=JSON.parse(text)}catch(e){}
+        return{status:r.status,statusCode:r.status,statusText:r.statusText,headers:r.headers,data,config:cfg};
+      }
+      const axios=Object.assign(
+        (u,c)=>fetchWrap(u,c),
+        {get:(u,c)=>fetchWrap(u,Object.assign({},c,{method:'GET'})),
+         post:(u,d,c)=>fetchWrap(u,Object.assign({},c,{method:'POST',data:d})),
+         put:(u,d,c)=>fetchWrap(u,Object.assign({},c,{method:'PUT',data:d})),
+         delete:(u,c)=>fetchWrap(u,Object.assign({},c,{method:'DELETE'})),
+         defaults:{headers:{common:{}}},create:()=>axios,interceptors:{request:{use:()=>{}},response:{use:()=>{}}}}
+      );
+      const httpShim={
+        get:(u,cb)=>{fetch(typeof u==='string'?u:u.url||u.href)
+          .then(async r=>{const t=await r.text();
+            if(cb)cb({statusCode:r.status,statusMessage:r.statusText,headers:r.headers,
+              on:(ev,h)=>{if(ev==='data')h(t);if(ev==='end')h&&setTimeout(()=>h(),0)}})})
+          .catch(e=>{throw e});return{on:()=>{}}},
+        request:()=>{throw new Error('http.request 复杂用法暂不支持，请用 fetch')}
+      };
+      // ===== crypto / 其它 =====
+      const crypto={
+        randomBytes:n=>{const a=new Uint8Array(n);for(let i=0;i<n;i++)a[i]=Math.random()*256|0;return a},
+        randomUUID:()=>(self.crypto&&self.crypto.randomUUID)?self.crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==='x'?r:(r&3|8)).toString(16)}),
+        createHash:a=>{throw new Error('crypto.createHash("'+a+'") 暂不支持，浏览器可用 crypto.subtle 的 async API')},
+        timingSafeEqual:(a,b)=>String(a)===String(b)
+      };
+      const unsupported=m=>{throw new Error('模块 "'+m+'" 在浏览器沙箱暂不支持，请在呆呆面板运行')}
+      const MODULES={fs,path,os,axios,'node-fetch':fetch,'cross-fetch':fetch,
+        http:httpShim,https:httpShim,crypto,
+        url:{parse:u=>new URL(u),URL},
+        querystring:{parse:q=>Object.fromEntries(new URLSearchParams(q)),stringify:o=>new URLSearchParams(o).toString()},
+        events:class{constructor(){this._h={}}on(k,f){(this._h[k]=this._h[k]||[]).push(f);return this}emit(k,...a){(this._h[k]||[]).forEach(f=>f(...a))}},
+        util:{promisify:f=>(...a)=>new Promise((res,rej)=>f(...a,(e,r)=>e?rej(e):res(r))),
+          inspect:x=>{try{return JSON.stringify(x)}catch(e){return String(x)}},format:(...a)=>a.join(' ')},
+        'child_process':{exec:unsupported,execSync:unsupported,spawn:unsupported}};
+      // ===== require 解析器 =====
+      const moduleCache={};
+      function requireLocal(p){
+        const k=norm(p);
+        if(!(k in VFS))throw enoent(p);
+        if(moduleCache[k])return moduleCache[k];
+        const m={exports:{}};
+        moduleCache[k]=m.exports;
+        try{
+          const fn=new Function('require','process','module','exports','__filename','__dirname',
+            '"use strict";\n'+VFS[k]+'\n');
+          fn(require,k==='.'||!k?'.':k.split('/').slice(0,-1).join('/')||'.',m,m.exports,k,k.split('/').slice(0,-1).join('/')||'.');
+        }catch(e){delete moduleCache[k];throw e}
+        moduleCache[k]=m.exports;
+        return m.exports;
+      }
+      function require(m){
+        if(m in MODULES)return MODULES[m];
+        if(m==='process')return process;
+        if(/^\.{0,2}\//.test(m))return requireLocal(m);
+        if(m==='@types/node'||m==='node:fs')return MODULES.fs;
+        if(m.startsWith('node:')){const c=m.slice(5);if(c in MODULES)return MODULES[c]}
+        throw new Error('require("'+m+'") 为外部 npm 包，浏览器沙箱无法安装。可改用 https 远程 import，或在呆呆面板运行。')
+      }
+      var process={env:ENV,argv:['node','script'],platform:'linux',version:'v20.0.0',
+        cwd:()=>'.',exit:()=>{},nextTick:f=>Promise.resolve().then(f),hrtime:()=>performance.now()};
+      var module={exports:{}},exports=module.exports;
+      var Buffer={from:x=>x,isBuffer:x=>typeof x==='string',alloc:n=>new Array(n).fill(0)};
+      var v;
+      var finish=function(ok,err){
+        if(ok&&v!==undefined)logs.push('返回值: '+(typeof v==='object'?JSON.stringify(v):String(v)));
+        if(err)logs.push(err);
+        send('done',{ok:ok,logs:logs,vfs:dirty?VFS:null});
+      };
+      try{
+        var fn=new Function('require','process','module','exports','Buffer','__filename','__dirname',
+          '"use strict";return (async()=>{\n'+code+'\n})()');
+        var r=fn(require,process,module,exports,Buffer,'script','.');
+        Promise.resolve(r).then(function(res){v=res;finish(true,null)})
+          .catch(function(err){finish(false,'[未捕获异常] '+(err&&err.message||err))});
+      }catch(e){
+        finish(false,'[语法/加载错误] '+(e&&e.message||e));
+      }
     };
-  };
-  console.log=wrap('log');console.warn=wrap('warn');console.error=wrap('error');
-  var require=function(m){throw new Error('require("'+m+'") 是 Node.js 专属能力，浏览器无法执行。请把此脚本放到服务器或呆呆面板运行。')};
-  var process={env:{},argv:[],platform:'browser',exit:function(){}};
-  var module={exports:{}},exports={},Buffer={from:function(x){return x}};
-  var v;
-  var finish=function(ok,err){
-    if(ok&&v!==undefined)logs.push('返回值: '+(typeof v==='object'?JSON.stringify(v):String(v)));
-    if(err)logs.push(err);
-    send('done',{ok:ok,logs:logs});
-  };
-  try{
-    var fn=new Function('require','process','module','exports','Buffer','__filename','__dirname','"use strict";return (async()=>{\\n'+code+'\\n})()');
-    var r=fn(require,process,module,exports,Buffer,'worker','worker');
-    Promise.resolve(r).then(function(res){v=res;finish(true,null)})
-      .catch(function(err){finish(false,'[未捕获异常] '+err.message)});
-  }catch(e){
-    finish(false,'[语法/加载错误] '+e.message);
   }
-};`;
+  const workerSrc='('+workerMain.toString()+')();';
   const t0=performance.now();
   let finished=false,timer,w;
   const finish=(ok,extra)=>{
@@ -796,6 +903,10 @@ self.onmessage=async function(e){
     toast(ok?'脚本运行成功 ✅':'脚本运行出错 ✘');
   };
   try{
+    // 初始化虚拟文件系统：上次运行遗留 + 已上传的全部脚本（供 fs / require('./xx') 访问）
+    const vfs=Object.assign({},store.get('bin_vfs',{}));
+    getScripts().forEach(x=>{vfs['./'+x.name]=x.content;vfs[x.name]=x.content});
+    const env=store.get('bin_env',{});
     const url=URL.createObjectURL(new Blob([workerSrc],{type:'text/javascript'}));
     w=new Worker(url);
     timer=setTimeout(()=>finish(false,'[超时] 运行超过 20 秒已强制终止（可能有死循环或长时间等待）'),20000);
@@ -803,13 +914,25 @@ self.onmessage=async function(e){
       const d=e.data;
       if(d.type==='log')logs.push(d.line);
       else if(d.type==='done'){
+        // 持久化脚本写入的文件（虚拟FS）
+        if(d.vfs){
+          const persist={};
+          let size=0;
+          for(const k in d.vfs){
+            if(k.startsWith('./')||getScripts().some(x=>x.name===k))continue; // 不保存脚本本体
+            size+=(d.vfs[k]||'').length;
+            if(size>512*1024)break;
+            persist[k]=d.vfs[k];
+          }
+          store.set('bin_vfs',persist);
+        }
         // 以 worker 汇总的日志为准（含返回值行），保留主线程的预处理提示
         logs=logs.filter(x=>x.startsWith('[提示]')).concat(d.logs||[]);
         finish(d.ok,null);
       }
     };
     w.onerror=e=>finish(false,'[脚本错误] '+(e.message||'未知错误'));
-    w.postMessage(code);
+    w.postMessage({code,vfs,env});
   }catch(e){
     finish(false,'[环境错误] 无法启动运行沙箱：'+e.message);
   }
